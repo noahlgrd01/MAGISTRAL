@@ -1,0 +1,350 @@
+#!/bin/bash
+
+# VARIABLES GLOBALES
+CONF_FILE="/etc/MagistralVPN/vpn.conf"
+VERSION="v3.5.9"
+AUTEUR="NoahLgrd"
+
+LOGS_DIR="/etc/MagistralVPN/logs"
+LOGS_FILE="$LOGS_DIR/update_$(date '+%d-%m-%Y_%H:%M:%S').log"
+
+# Regex pour détecter un nombre
+re='^[0-9]+$'
+
+# Affiche un "logo" en ASCII Art de MagistralVPN
+asciiArtMenu() {
+    echo -e "\e[32m  __  __             _     _             ___      _______  _   _ "
+    echo " |  \/  |           (_)   | |           | \ \    / /  __ \| \ | |"
+    echo " | \  / | __ _  __ _ _ ___| |_ _ __ __ _| |\ \  / /| |__) |  \| |"
+    echo " | |\/| |/ _' |/ _  | / __| __| '__/ _' | | \ \/ / |  ___/| . ' |"
+    echo " | |  | | (_| | (_| | \__ \ |_| | | (_| | |  \  /  | |    | |\  |"
+    echo " |_|  |_|\__,_|\__, |_|___/\__|_|  \__,_|_|   \/   |_|    |_| \_|"
+    echo "                __/ |                                            "
+    echo -e "               |___/                                             \e[0m"
+    echo ""
+    echo ""
+    echo -e "\e[36m$VERSION - $AUTEUR\e[0m"
+}
+
+# Récupère la valeur d'une clé passée en paramètre
+getValeurCle() {
+    local key="$1"
+    local file=$CONF_FILE
+    local value=$(grep -E "^$key=" "$file" | cut -d'=' -f2-)
+
+    echo "$value"
+}
+
+# Modifie la valeur d'une clé passée en paramètre
+setValeurCle() {
+    local key="$1"
+    local file="$CONF_FILE"
+    local value="$2"
+
+    if [[ ! -f "$file" ]]; then
+        echo "Erreur : Le fichier $file n'existe pas."
+        return 1
+    fi
+
+    # Vérifier si la clé existe déjà
+    if grep -q "^$key=" "$file"; then
+        sudo sed -i "s|^$key=.*|$key=$value|" "$file"
+    else
+        # Ajouter la clé si elle n'existe pas
+        echo "$key=$value" >> "$file"
+    fi
+}
+
+# Génère le fichier client
+genererFichierClient() {
+    local ip_client="$1"
+    local ip_serveur_pb="$2"
+    local port="$3"
+    local fichier="$4"
+    local cle_client_prive="$5"
+    local cle_serveur_public="$6"
+
+    echo "[Interface]" >> "$fichier"
+    echo "PrivateKey = $cle_client_prive" >> "$fichier"
+    echo "Address = $ip_client" >> "$fichier"
+    echo "" >> "$fichier"
+    echo "[Peer]" >> "$fichier"
+    echo "PublicKey = $cle_serveur_public" >> "$fichier"
+    echo "Endpoint = $ip_serveur_pb:$port" >> "$fichier"
+    echo "AllowedIPs = 0.0.0.0/0" >> "$fichier"
+    echo "PersistentKeepalive = 25" >> "$fichier"
+}
+
+# Génère le fichier serveur
+genererFichierServeur() {
+    local ip_serveur="$1"
+    local port_serveur="$2"
+    local ip_client="$3"
+    local fichier="$4"
+    local cle_serveur_prive="$5"
+    local cle_client_public="$6"
+
+    echo "[Interface]" >> "$fichier"
+    echo "PrivateKey = $cle_serveur_prive" >> "$fichier"
+    echo "Address = $ip_serveur" >> "$fichier"
+    echo "ListenPort = $port_serveur" >> "$fichier"
+    echo "" >> "$fichier"
+    echo "[Peer]" >> "$fichier"
+    echo "PublicKey = $cle_client_public" >> "$fichier"
+    echo "AllowedIPs = $ip_client" >> "$fichier"
+}
+
+# Génère le fichier README pour la paire de connexion
+genererReadmePaire() {
+    local profil="$1"
+    local fichier_serveur="$2"
+    local fichier_client="$3"
+    echo "# Fichiers .conf #" >> README_${profil}.md
+    echo "Client : renommer $fichier_client en $profil.conf et le déplacer dans '/etc/wireguard/'" >> README_${profil}.md
+    echo "Serveur : renommer $fichier_serveur en $profil.conf et le déplacer dans '/etc/wireguard/ (dans la partie serveur)'" >> README_${profil}.md
+    echo "------- : puis 'sudo wg-quick up $profil'" >> README_${profil}.md
+    echo "------- : puis 'sudo systemctl enable wg-quick@$profil'" >> README_${profil}.md
+    echo "Client : se connecter avec MagistralVPN puis option 1" >> README_${profil}.md
+}
+
+# Génère le fichier README pour un nouveau client
+genererReadmeClient() {
+    local profil="$1"
+    local fichier_temp="$2"
+    echo "# Fichiers .conf #" >> README_${profil}.md
+    echo "Client : renommer ${profil}_client.conf en $profil.conf et le déplacer dans '/etc/wireguard/'" >> README_${profil}.md
+    echo "Serveur : Récupérer le bloc dans temp_serv.conf, puis l'ajouter dans le fichier"  >> README_${profil}.md
+    echo "--------  de configuration du serveur." >> README_${profil}.md
+    echo "Client : se connecter avec MagistralVPN puis option 1" >> README_${profil}.md
+}
+
+# Désinstaller le client VPN
+desintaller() {
+    sudo rm /bin/MagistralVPN
+    sudo rm -rf /etc/MagistralVPN
+    echo "[*] Désinstallation effectuée. Merci d'avoir utilisé Magistral VPN !"
+    sleep 1
+    exit 0
+}
+
+# Met à jour le client VPN
+update() {
+    fichier_log=$LOGS_FILE
+    sudo touch "$fichier_log"
+    sudo chmod a+w "$fichier_log"
+    echo "[*] Début de la mise à jour..." | sudo tee -a "$fichier_log"
+    sudo git clone https://github.com/noahlgrd01/MagistralVPN.git 2>&1 | sudo tee -a "$fichier_log"
+
+    if [ -d "MagistralVPN" ]; then
+        cd MagistralVPN/ || { echo "Erreur : Impossible d'entrer dans le dossier" | sudo tee -a "$fichier_log"; return 1; }
+        sudo cp MagistralVPN /bin/MagistralVPN 2>&1 | sudo tee -a "$fichier_log"
+        cd ..
+        sudo rm -rf MagistralVPN/ 2>&1 | sudo tee -a "$fichier_log"
+    else
+        echo "Erreur : Clonage échoué, dossier MagistralVPN introuvable." | sudo tee -a "$fichier_log"
+        return 1
+    fi
+
+    echo "[*] Mise à jour réussie !" | sudo tee -a "$fichier_log"
+    echo "[*] Redémarrer MagistralVPN pour prendre en compte les modifications" | sudo tee -a "$fichier_log"
+}
+
+# Double authentification
+2FA() {
+    # 2FA=$(getValeurCle "2FA")
+    # ...
+    # À implémenter dans gestionnaire()
+    # si 2FA neq NON alors on continue
+    # sinon, on active cette fonction
+    # ...
+    echo "coucou" &> /dev/null
+}
+
+# Menu d'affichage
+menu() {
+    clear
+    asciiArtMenu
+    echo ""
+    echo ""
+    echo -e "\e[32m[1] Activer/Désactiver le VPN"
+    echo "[2] Créer une connexion"
+    echo "[3] Modifier les paramètres"
+    echo "[4] Mettre à jour"
+    echo ""
+    echo "[U] Désinstaller"
+    echo -e "[Q] Quitter"
+    echo ""
+    read -p ">> " choix
+    gestionnaire "$choix"
+}
+
+# Gestionnaire des options, lié au menu d'affichage
+gestionnaire() {
+    local choix="$1"
+    if ! [[ $choix =~ $re ]]; then
+        # [Q] Quitter
+        if [[ $choix == "Q" ]] || [[ $choix == "q" ]]; then
+            echo "Au revoir !"
+            sleep 1
+            clear
+            exit 0
+        elif [[ $choix == "U" ]] || [[ $choix == "u" ]]; then
+            desintaller
+            exit 0
+        fi
+        echo "[ERR] $choix n'est pas une option valide"
+        sleep 1
+        menu
+    else
+        # [1] Activer/Désactiver le VPN
+        if [ $choix -eq 1 ]; then
+            DEFAULT_PROFILE=$(getValeurCle "DEFAULT_PROFILE")
+            if ip link show $DEFAULT_PROFILE &> /dev/null; then
+                sudo wg-quick down $DEFAULT_PROFILE &> /dev/null
+                echo "[*] VPN désactivé"
+                exit 0
+            else
+                if [[ $DEFAULT_PROFILE == "???" ]]; then
+                    echo "La valeur du profil par défaut n'est pas définie."
+                    echo "Veuillez la définir dans ''Menu > 3''"
+                    sleep 3
+                    menu
+                else
+                    sudo wg-quick up $DEFAULT_PROFILE &> /dev/null
+                    echo "[*] VPN activé"
+                    exit 0
+                fi
+            fi
+        # [2] Créer une connexion
+        elif [ $choix -eq 2 ]; then
+            clear
+            # Saisie des informations
+            echo "[1] Nouveau client (pour un serveur déjà configuré)"
+            echo "[2] Paire client-serveur"
+            read -p ">> " choix_connexion
+
+            # [1] Nouveau client (pour un serveur déjà configuré)
+            if [ $choix_connexion -eq 1 ]; then
+                clear
+                echo "[*] Entrer le nom du profil"
+                read -p ">> " nom_profil
+                echo ""
+                echo "[*] Entrer l'IP du client /XX (privée)"
+                read -p ">> " ip_client
+                echo ""
+                echo "[*] Entrer l'IP du serveur (public)"
+                read -p ">> " ip_serveur_public
+                echo ""
+                echo "[*] Entrer le port du serveur"
+                read -p ">> " port_serveur
+                echo ""
+                echo "[*] Entrer la clé publique du serveur"
+                echo "(il était conseillé de la conserver lors de la création initiale)"
+                echo "(récupérable dans le fichier .conf du serveur sinon)"
+                read -p ">> " cle_serv_pub
+                echo ""
+
+                # Générations des clés
+                echo "[*] Génération des clés en cours ..."
+                wg genkey | tee client_private.key | wg pubkey > client_public.key
+                echo "[*] Clés du client générées !"
+                echo "------------------------------------"
+
+                # Récupération de la clé
+                cle_cli_priv=$(cat client_private.key)
+                cle_cli_pub=$(cat client_public.key)
+
+                # Attribution du nom de fichier
+                nom_profil_client=$nom_profil"_client.conf"
+
+                if [[ $is_defaut == "OUI" ]]; then
+                    setValeurCle "DEFAULT_PROFILE" "$nom_profil"
+                fi
+
+                genererFichierClient "$ip_client" "$ip_serveur_public" "$port_serveur" "$nom_profil_client" "$cle_cli_priv" "$cle_serv_pub"
+                echo "[*] Fichier client généré !"
+                echo ""
+                genererReadmeClient "$nom_profil"
+                mkdir $nom_profil
+                echo "[Peer]" >> "temp_serv.conf"
+                echo "PublicKey = $cle_cli_pub" >> "temp_serv.conf"
+                echo "AllowedIPs = $ip_client" >> "temp_serv.conf"
+                mv client_public.key client_private.key temp_serv.conf README_${nom_profil}.md $nom_profil_client $nom_profil/
+                echo "[*] Les clés et les .conf ont été déplacées dans le répertoire ${nom_profil}"
+                echo "------------------------------------"
+                
+                sleep 2
+                menu
+            # [2] Paire client-serveur
+            elif [ $choix_connexion -eq 2 ]; then
+                clear
+                echo "[*] Entrer le nom du profil"
+                read -p ">> " nom_profil
+                echo ""
+                echo "[*] Profil par défaut ? (OUI ou NON)"
+                read -p ">> " is_defaut
+                echo ""
+                echo "[*] Entrer l'IP du serveur (public)"
+                read -p ">> " ip_serveur_public
+                echo ""
+                echo "[*] Entrer le port du serveur"
+                read -p ">> " port_serveur
+                echo ""
+                echo "[*] Entrer l'IP du serveur /XX (privée)"
+                echo "(Il s'agit de l'IP/XX qu'aura le serveur VPN sur le réseau interne)"
+                read -p ">> " ip_serveur_privee
+                echo ""
+                echo "[*] Entrer l'IP du client /XX (privée)"
+                read -p ">> " ip_client
+                echo ""
+
+                # Générations des clés
+                echo "[*] Génération des clés en cours ..."
+                wg genkey | tee server_private.key | wg pubkey > server_public.key
+                echo "[*] Clés du serveur générées !"
+                wg genkey | tee client_private.key | wg pubkey > client_public.key
+                echo "[*] Clés du client générées !"
+                echo "------------------------------------"
+
+                # Récupération des clés
+                cle_cli_pub=$(cat client_public.key)
+                cle_cli_priv=$(cat client_private.key)
+                cle_serv_pub=$(cat server_public.key)
+                cle_serv_priv=$(cat server_private.key)
+
+                # Attribution des noms de fichier
+                nom_profil_serveur=$nom_profil"_serveur.conf"
+                nom_profil_client=$nom_profil"_client.conf"
+
+                if [[ $is_defaut == "OUI" ]]; then
+                    setValeurCle "DEFAULT_PROFILE" "$nom_profil"
+                fi
+
+                genererFichierServeur "$ip_serveur_privee" "$port_serveur" "$ip_client" "$nom_profil_serveur" "$cle_serv_priv" "$cle_cli_pub"
+                echo "[*] Fichier serveur généré !"
+                genererFichierClient "$ip_client" "$ip_serveur_public" "$port_serveur" "$nom_profil_client" "$cle_cli_priv" "$cle_serv_pub"
+                echo "[*] Fichier client généré !"
+                genererReadmePaire "$nom_profil" "$nom_profil_serveur" "$nom_profil_client"
+                mkdir $nom_profil
+                mv client_public.key client_private.key server_public.key server_private.key README_${nom_profil}.md $nom_profil_serveur $nom_profil_client $nom_profil/
+                echo "[*] Les clés et les .conf ont été déplacées dans le répertoire ${nom_profil}"
+                echo "[!] N'oubliez pas de garder de côté les 4 clés en cas de problèmes/prochaines configuration"
+                echo "------------------------------------"
+                sleep 2
+                menu
+            fi
+            
+        # [3] Modifier les paramètres
+        elif [ $choix -eq 3 ]; then
+            sudo nano $CONF_FILE
+            menu
+        # [4] Mettre à jour
+        elif [ $choix -eq 4 ]; then
+            update
+            exit 0
+        fi
+    fi
+}
+
+sudo -v
+menu
