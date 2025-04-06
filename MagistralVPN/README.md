@@ -14,7 +14,7 @@
 
 * Pour installer "Magistral VPN", il faut exécuter
     - `git clone https://github.com/noahlgrd01/MAGISTRAL`
-    - `cd MagistralVPN/scripts`
+    - `cd MAGISTRAL/MagistralVPN/scripts`
     - `chmod a+x install.sh`
     - `./install.sh`
 * Il installe automatiquement les packages "wireguard", "libgtk-3-dev" et "build-essential"
