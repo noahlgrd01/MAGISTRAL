@@ -1,5 +1,5 @@
 <h1 style="display: flex; align-items: center;">
-    <img src="https://github.com/noahlgrd01/MagistralVPN/blob/main/images/magistral.jpg" alt="Magistral" width="150" style="margin-right: 20px;">
+    <img src="https://github.com/noahlgrd01/MAGISTRAL/blob/main/MagistralVPN/images/magistral.jpg" alt="Magistral" width="150" style="margin-right: 20px;">
     MagistralVPN
 </h1>
 
@@ -13,7 +13,7 @@
 # Installation #
 
 * Pour installer "Magistral VPN", il faut exécuter
-    - `git clone https://github.com/noahlgrd01/MagistralVPN/`
+    - `git clone https://github.com/noahlgrd01/MAGISTRAL`
     - `cd MagistralVPN/scripts`
     - `chmod a+x install.sh`
     - `./install.sh`
