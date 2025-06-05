@@ -15,8 +15,9 @@ echo "IP=x.x.x.x" | sudo tee /etc/MagistralVPN/2fa.conf > /dev/null
 echo "PORT=??" | sudo tee -a /etc/MagistralVPN/2fa.conf > /dev/null
 
 # Installation des packages annexes
-sudo apt install wireguard &> /dev/null
-sudo apt install libgtk-3-dev build-essential &> /dev/null
+sudo apt install wireguard -y &> /dev/null
+sudo apt install libgtk-3-dev build-essential -y &> /dev/null
+sudo apt install gcc pkg-config -y &> /dev/null
 
 # Compile le client GUI
 cd ../GUI/

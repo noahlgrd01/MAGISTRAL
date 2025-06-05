@@ -2,7 +2,7 @@
 
 # VARIABLES GLOBALES
 CONF_FILE="/etc/MagistralVPN/vpn.conf"
-VERSION="v3.5.9"
+VERSION="v3.5.10"
 AUTEUR="NoahLgrd"
 
 LOGS_DIR="/etc/MagistralVPN/logs"
