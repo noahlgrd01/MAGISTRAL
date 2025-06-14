@@ -2,7 +2,7 @@
 
 # VARIABLES GLOBALES
 CONF_FILE="/etc/MagistralVPN/vpn.conf"
-VERSION="v3.5.13"
+VERSION="v3.5.14"
 AUTEUR="NoahLgrd"
 
 LOGS_DIR="/etc/MagistralVPN/logs"
@@ -138,8 +138,8 @@ update() {
     if [ -d "MAGISTRAL" ]; then
         cd MAGISTRAL/MagistralVPN/ || { echo "Erreur : Impossible d'entrer dans le dossier" | sudo tee -a "$fichier_log"; return 1; }
         sudo cp -r MagistralVPN /bin/MagistralVPN 2>&1 | sudo tee -a "$fichier_log"
-        cd ..
-        sudo rm -rf MagistralVPN/ 2>&1 | sudo tee -a "$fichier_log"
+        cd ../..
+        sudo rm -rf MAGISTRAL 2>&1 | sudo tee -a "$fichier_log"
     else
         echo "Erreur : Clonage échoué, dossier MagistralVPN introuvable." | sudo tee -a "$fichier_log"
         return 1
