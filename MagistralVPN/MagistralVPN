@@ -2,7 +2,7 @@
 
 # VARIABLES GLOBALES
 CONF_FILE="/etc/MagistralVPN/vpn.conf"
-VERSION="v3.5.12"
+VERSION="v3.5.13"
 AUTEUR="NoahLgrd"
 
 LOGS_DIR="/etc/MagistralVPN/logs"
@@ -133,10 +133,10 @@ update() {
     sudo touch "$fichier_log"
     sudo chmod a+w "$fichier_log"
     echo "[*] Début de la mise à jour..." | sudo tee -a "$fichier_log"
-    sudo git clone https://github.com/noahlgrd01/MagistralVPN.git 2>&1 | sudo tee -a "$fichier_log"
+    sudo git clone https://github.com/noahlgrd01/MAGISTRAL.git 2>&1 | sudo tee -a "$fichier_log"
 
-    if [ -d "MagistralVPN" ]; then
-        cd MagistralVPN/ || { echo "Erreur : Impossible d'entrer dans le dossier" | sudo tee -a "$fichier_log"; return 1; }
+    if [ -d "MAGISTRAL" ]; then
+        cd MAGISTRAL/MagistralVPN/ || { echo "Erreur : Impossible d'entrer dans le dossier" | sudo tee -a "$fichier_log"; return 1; }
         sudo cp -r MagistralVPN /bin/MagistralVPN 2>&1 | sudo tee -a "$fichier_log"
         cd ..
         sudo rm -rf MagistralVPN/ 2>&1 | sudo tee -a "$fichier_log"
