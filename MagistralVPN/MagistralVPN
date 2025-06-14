@@ -2,7 +2,7 @@
 
 # VARIABLES GLOBALES
 CONF_FILE="/etc/MagistralVPN/vpn.conf"
-VERSION="v3.5.11"
+VERSION="v3.5.12"
 AUTEUR="NoahLgrd"
 
 LOGS_DIR="/etc/MagistralVPN/logs"
@@ -23,7 +23,7 @@ asciiArtMenu() {
     echo -e "               |___/                                             \e[0m"
     echo ""
     echo ""
-    echo -e "\e[36m$VERSION - $AUTEUR\e[0m"
+    echo -e "\e[36m$VERSION - $AUTEUR \e[0m"
 }
 
 # Récupère la valeur d'une clé passée en paramètre
@@ -137,7 +137,7 @@ update() {
 
     if [ -d "MagistralVPN" ]; then
         cd MagistralVPN/ || { echo "Erreur : Impossible d'entrer dans le dossier" | sudo tee -a "$fichier_log"; return 1; }
-        sudo cp MagistralVPN /bin/MagistralVPN 2>&1 | sudo tee -a "$fichier_log"
+        sudo cp -r MagistralVPN /bin/MagistralVPN 2>&1 | sudo tee -a "$fichier_log"
         cd ..
         sudo rm -rf MagistralVPN/ 2>&1 | sudo tee -a "$fichier_log"
     else
@@ -174,7 +174,8 @@ menu() {
     echo "[U] Désinstaller"
     echo -e "[Q] Quitter"
     echo ""
-    read -p ">> \e[0m" choix
+    read -p ">> " choix
+    echo -e "\e[0m"
     gestionnaire "$choix"
 }
 
